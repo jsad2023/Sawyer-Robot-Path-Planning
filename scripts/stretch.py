@@ -1,4 +1,6 @@
-
+"""
+Script for stretching Sawyer robot
+"""
 # Import the necessary Python modules # rospy - ROS Python API
 import rospy # intera_interface - Sawyer Python API
 import intera_interface # initialize our ROS node, registering it with the Master 
