@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from sawyer import Sawyer
 from obstacles import obstacles, goal_cartesian_point
 from inverse_kinematics import ik_service_client
+import matplotlib.animation as animation
+
 sawyer = Sawyer()
 class Node:
     """
@@ -190,7 +192,37 @@ def move_sawyer_along_path(node_path: List[Node]) -> None:
         sawyer.move_to_joint_positions()
         rospy.sleep(.75)
 
-def example_run():
+def animate_sawyer(node_path: List[Node]) -> None:
+    """
+    Animate the sawyer robot
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    def update(frame):
+        ax.cla()
+        # Plot current configuration
+        configuration = node_path[frame].config
+        sawyer.change_config(configuration)
+        sawyer.plot(ax)
+        # Plot starting configuration
+        starting_configuration = node_path[0].config
+        sawyer.change_config(starting_configuration)
+        sawyer.plot(ax, color='purple')
+        # Plot obstacles
+        for sphere in obstacles:
+            sphere.plot(ax)
+        # Plot goal point
+        x_goal, y_goal, z_goal = goal_cartesian_point
+        ax.scatter(x_goal, y_goal, z_goal, marker="*", color='gold')
+
+    ani = animation.FuncAnimation(fig=fig, func=update, frames=len(node_path))
+    plt.show()
+
+
+def run():
     x_end, y_end, z_end  = goal_cartesian_point 
     goal_config = ik_service_client(x_end, y_end, z_end)
     #x_end, y_end, z_end  = (0.9, 0.16, 0.4)
@@ -208,9 +240,10 @@ def example_run():
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+    # Plot goal state
     sawyer.plot(ax)
     sawyer.change_config(goal_config)
-    sawyer.plot(ax)
+    sawyer.plot(ax, color='gold')
     for sphere in obstacles:
         sphere.plot(ax)
     plt.show()
@@ -223,10 +256,12 @@ def example_run():
     print('goal endpoint', sawyer.get_endpoint(config=goal_config))
     print('starting_cost', cost_between_nodes(Node(goal_config), Node(start_config)))
     print("Starting planner....")
-    move_sawyer_along_path(rrt.plan())
+    nodes_path = rrt.plan()
+    move_sawyer_along_path(nodes_path)
+    animate_sawyer(nodes_path)
 
 
 
 
 if __name__ == "__main__":
-    example_run()
+    run()
