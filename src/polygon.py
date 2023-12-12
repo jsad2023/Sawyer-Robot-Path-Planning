@@ -131,6 +131,16 @@ class Cylinder(Polygon):
         assert (isinstance(translation, np.ndarray) and translation.shape == (3,1))
         self._rotation = rotation
         self._translation = translation
+
+    def get_body_frame(self):
+        """
+        It is assume that every cylinder will have its own body frame.
+        such that the center of the bottom face of the cylinder is at the origin and the 
+        cylinder extends in the z-direction for self.height meters. 
+        Outside of the Cylinder class, the the rotation matrix and the translation 
+        vector iwll be calculate
+        """
+        return self._rotation, self._translation
     
     def _collides_with_point(self, point: np.ndarray) -> bool:
         """
@@ -168,7 +178,6 @@ class Cylinder(Polygon):
         # Center of sphere wrt to the cylinder
         sphere_center = self._rotation.T @ (sphere.center - self._translation)
         # Closest point to cylinder's axis
-        print(sphere_center.shape)
         closest_point_to_axis = np.clip(
             np.array([[0],[0],[sphere_center[2, 0]]]),
             0,

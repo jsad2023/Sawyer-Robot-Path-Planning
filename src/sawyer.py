@@ -2,11 +2,12 @@
 Sawyer class to control robot.
 """
 from numbers import Number
+from typing import List
 import numpy as np
 import rospy # intera_interface - Sawyer Python API
 import intera_interface # initialize our ROS node, registering it with the Master 
 from polygon import Cylinder, Sphere
-from geometry import get_rotation_matrix
+from geometry import rotation_matrix
 from geometry import Direction
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -29,7 +30,7 @@ class Sawyer:
         rospy.init_node('path_planning')
         self._limb = intera_interface.Limb('right')
         self._num_joints = 7
-        self.angles = self._limb.jointangles() # print the current joint angles
+        self.angles = self._limb.joint_angles() # print the current joint angles
         self.angles = {}
         self.angles['right_j0']=0.0
         self.angles['right_j1']=0.0
@@ -40,14 +41,14 @@ class Sawyer:
         self.angles['right_j6']=0.0
         self.move_to_joint_positions()
         # Limits on the joint angles
-        self.limits = {}
-        self.limits['right_j0']=(-np.pi / 4, np.pi / 3)
-        self.limits['right_j1']=(-np.pi / 12, np.pi / 12)
-        self.limits['right_j2']=(-np.pi, np.pi)
-        self.limits['right_j3']=(-np.pi / 6, np.pi / 6)
-        self.limits['right_j4']=(-np.pi, np.pi)
-        self.limits['right_j5']=(-5 * np.pi / 6, 5 * np.pi / 6)
-        self.limits['right_j6']=(-np.pi, np.pi)
+        #self.limits = {}
+        #self.limits['right_j0']=(-np.pi / 4, np.pi / 3)
+        #self.limits['right_j1']=(-np.pi / 6, np.pi / 6)
+        #self.limits['right_j2']=(-np.pi, np.pi)
+        #self.limits['right_j3']=(-np.pi / 6, np.pi / 6)
+        #self.limits['right_j4']=(-np.pi, np.pi)
+        #self.limits['right_j5']=(-5 * np.pi / 6, 5 * np.pi / 6)
+        #self.limits['right_j6']=(-np.pi, np.pi)
 
 
         # Initializing Cylinders
@@ -64,19 +65,19 @@ class Sawyer:
         # rotations[i] = rotation matrix from reference frame i - 1 to i if i >= 1
         # rotation[0] = rotation matrix from world reference frame to reference frame 0
         rotations = [
-            get_rotation_matrix(Direction.Z, self.angles['right_j0']),
-            (get_rotation_matrix(Direction.Z, self.angles['right_j1'])
-            @ get_rotation_matrix(Direction.X, - np.pi / 2)),
-            (get_rotation_matrix(Direction.Z, self.angles['right_j2'])
-            @ get_rotation_matrix(Direction.Y, np.pi / 2)),
-            (get_rotation_matrix(Direction.Z, self.angles['right_j3'])
-            @ get_rotation_matrix(Direction.Y,  np.pi / 2)),
-            (get_rotation_matrix(Direction.Z, self.angles['right_j4'])
-            @ get_rotation_matrix(Direction.Y, - np.pi / 2)),
-            (get_rotation_matrix(Direction.Z, self.angles['right_j5'])
-            @ get_rotation_matrix(Direction.Y, - np.pi / 2)),
-            (get_rotation_matrix(Direction.Z, self.angles['right_j6'])
-            @ get_rotation_matrix(Direction.Y,  np.pi / 2))
+            rotation_matrix(Direction.Z, self.angles['right_j0']),
+            ( rotation_matrix(Direction.X, - np.pi / 2)
+            @ rotation_matrix(Direction.Z, self.angles['right_j1'])),
+            (rotation_matrix(Direction.Y, np.pi / 2)
+            @ rotation_matrix(Direction.Z, self.angles['right_j2'])),
+            (rotation_matrix(Direction.Y,  np.pi / 2)
+            @ rotation_matrix(Direction.Z, -self.angles['right_j3'])),
+            ( rotation_matrix(Direction.Y, - np.pi / 2)
+            @rotation_matrix(Direction.Z, self.angles['right_j4'])),
+            (rotation_matrix(Direction.Y, - np.pi / 2)
+            @ rotation_matrix(Direction.Z, self.angles['right_j5'])),
+            ( rotation_matrix(Direction.Y,  np.pi / 2)
+            @rotation_matrix(Direction.Z, self.angles['right_j6']))
         ]
 
         # tranlations[i] = translation vector from reference frame i - 1 to i if i >= 1
@@ -116,14 +117,14 @@ class Sawyer:
         Returns true if joint angle was changed to the specified number.
         """
         angle = (angle + np.pi) % (2 * np.pi) - np.pi
-        if joint_name not in self.limits:
+        if joint_name not in self.angles:
             return False
 
-        lowest, highest = self.limits[joint_name]
-        if angle < lowest or angle > highest:
-            return False
+        #lowest, highest = self.limits[joint_name]
+        #if angle < lowest or angle > highest:
+        #    return False
+
         self.angles[joint_name] = angle
-
         if single_change:
             self.set_reference_frames()
 
@@ -132,10 +133,10 @@ class Sawyer:
         """
         Change entire configuration of Sawyer robot
         """
-        old_config = self.angles()
-        for joint_name, angle in config:
+        old_config = self.angles
+        for joint_name, angle in config.items():
             if not self.change_joint_angle(joint_name, angle):
-                print(f"Configuration {config} is not possible ")
+                print(f"Configuration {config} is not possible.\n{joint_name} can't be at angle {angle}")
                 self.angles = old_config
                 return False
         self.set_reference_frames()
@@ -155,7 +156,7 @@ class Sawyer:
                 return True
         self.angles = old_config
         return False    
-    def collides_with_sphere(self, obstacles: list[Sphere]):
+    def collides_with_sphere(self, obstacles: List[Sphere]):
         """
         Test if sawyer is in collision with any spheres in 
         a list of spheres test_points at the specified configuration. 
@@ -169,6 +170,23 @@ class Sawyer:
     
     def get_config(self):
         return self.angles
+    
+    def get_endpoint(self, config=None):
+        if config is not None:
+            old_config = self.angles
+            self.change_config(config)
+        rotation_matrix, translation = self._cylinders[-1].get_body_frame()
+        v = np.array([[0], [0], [self._link_lengths[-1]]])
+        print(rotation_matrix, translation)
+        if config is not None:
+            self.angles = old_config
+        return rotation_matrix @ v + translation
+    
+    def print_reference_frames(self):
+        print('----------------reference frames for config', self.angles)
+        for cylinder in self._cylinders:
+            print(cylinder.get_body_frame())
+
 
 #########
 # Tests
@@ -186,6 +204,22 @@ def plot_sawyer():
     Sawyer().plot(ax)
     plt.show()
 
+def rotating_sawyer():
+    """
+    Rotating Sawyer
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    sawyer = Sawyer()
+    sawyer.plot(ax)
+    sawyer.angles['right_j0'] = np.pi / 4
+    sawyer.set_reference_frames()
+    sawyer.plot(ax, color='b')
+    plt.show()
+
 
 if __name__ == "__main__":
-    plot_sawyer()
+    rotate_sawyer()

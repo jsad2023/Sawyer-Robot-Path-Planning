@@ -1,11 +1,14 @@
 """
 Module for Rapidly-exploring Random Trees (RRT)
 """
+import rospy # intera_interface - Sawyer Python API
+from typing import List
 from numbers import Number
 import numpy as np
 import matplotlib.pyplot as plt
 from sawyer import Sawyer
 from obstacles import obstacles
+from inverse_kinematics import ik_service_client
 
 sawyer = Sawyer()
 class Node:
@@ -20,8 +23,14 @@ def cost_between_nodes(node1: Node, node2: Node) -> Number:
     """
     Function to determine the cost between nodes
     """
-    v1 = np.array(node1.config.values())
-    v2 = np.array(node2.config.values())
+    old_config = sawyer.get_config()
+    if not sawyer.change_config(node1.config):
+        return np.inf 
+    v1 = sawyer.get_endpoint()
+    if not sawyer.change_config(node2.config):
+        return np.inf 
+    v2 = sawyer.get_endpoint()
+    sawyer.change_config(old_config)
     return np.linalg.norm(v1 - v2)
 
 #def generate_new_node(config1: dict, config2: dict, mult: Number) -> dict:
@@ -39,22 +48,28 @@ class RRT:
     """
     Class for RRT
     """
-    def __init__(self, start: dict,  goal: dict, max_iter=1000):
+    def __init__(self, start: dict,  goal: dict, max_iter=10000):
         self.start = Node(start)
         self.dimensions = 7
         self.goal = Node(goal)
         self.max_iter = max_iter
-        self.step_size = 0.1
+        self.step_size = 0.25
         self.nodes = [self.start]
 
     def generate_random_node(self) -> Node:
         """
         Generate a random configuration in free space
         """
-        random_array = [np.random.uniform(low, high) for low, high in sawyer.limits.values()]
         while True:
+            #print('loop1')
+            close_configuration = np.random.choice(self.nodes)
+            angle_values = list(close_configuration.config.values())
+            random_array = [ang + np.random.rand() - .5 for ang in angle_values]
+            #random_array = list(np.random.uniform(low=-np.pi, high=np.pi, size=self.dimensions))
             config = dict(zip(sawyer.joint_names, random_array))
+            #input(f"{config}")
             if not self.node_collides(Node(config)):
+                #print(config, close_configuration.config)
                 break
         return Node(config)
     def generate_new_node(self, q_near: Node, q_rand: Node) -> Node:
@@ -64,16 +79,18 @@ class RRT:
         new_config = {}
         for name in sawyer.joint_names:
             new_config[name] = (
-                self.step_size * (q_near.config[name] - q_rand.config[name])
+                self.step_size * (q_rand.config[name] - q_near.config[name])
                 + q_near.config[name]
             )
         return Node(new_config)
+
     def node_collides(self, q: Node) -> bool:
         """
-        Determien if node collides.
+        Determien if node True if node is impossible to reach
         """
         old_config = sawyer.get_config()
-        sawyer.change_config(q.config)
+        if not sawyer.change_config(q.config):
+            return True
         collision = sawyer.collides_with_sphere(obstacles)
         sawyer.change_config(old_config)
         return collision
@@ -95,6 +112,7 @@ class RRT:
         """
         Determien if goal is reached. 
         """
+        #print(cost_between_nodes(q, self.goal))
         return cost_between_nodes(q, self.goal) < self.step_size
 
     def extend(self, q_rand: Node) -> Node:
@@ -105,34 +123,37 @@ class RRT:
         #new_config = self.steer(nearest_node.config, random_config)
         q_new = self.generate_new_node(q_near, q_rand)
         if not self.node_collides(q_new):
+            #print('adding new node to tree. Size=', len(self.nodes))
             self.nodes.append(q_new)
             q_new.parent = q_near
             return q_new
         return None
 
-    def plan(self) -> list(Node):
+    def plan(self) -> List[Node]:
         """
         Planner for RRT
         """
         for _ in range(self.max_iter):
             q_rand = self.generate_random_node()
             new_node = self.extend(q_rand)
-            if new_node and self.is_goal_reached(new_node.config):
+            if new_node and self.is_goal_reached(new_node):
                 print("Goal reached!")
-                return self.extract_path(new_node)
+                self.goal.parent = new_node
+                self.nodes.append(self.goal)
+                return self.extract_path()
         print("RRT reached the maximum number of iterations.")
         return None
 
-    def extract_path(self, end_node: Node):
+    def extract_path(self):
         """
         Extract path
         """
         node_path = []
-        current_node = end_node
+        current_node = self.goal
         while current_node is not None:
             node_path.append(current_node)
             current_node = current_node.parent
-        return np.array(path[::-1])
+        return np.array(node_path[::-1])
 
 def visualize_rrt(rrt, path=None):
     nodes = np.array([node.config for node in rrt.nodes])
@@ -151,13 +172,52 @@ def visualize_rrt(rrt, path=None):
     plt.title('Rapidly-exploring Random Trees (RRT)')
     plt.show()
 
-# Example usage
-start_config = np.array([0, 0, 0, 0, 0, 0, 0])
-goal_config = np.array([1, 1, 1, 1, 1, 1, 1])
-dimensions = 7
+def move_sawyer_along_path(node_path: List[Node]) -> None:
+    for node in node_path:
+        print(sawyer.get_endpoint())
+        if not sawyer.change_config(node.config):
+            print("something went wrong")
+        sawyer.move_to_joint_positions()
+        rospy.sleep(0.5)
 
-rrt = RRT(start_config, dimensions, goal_config, step_size=0.1, max_iter=1000)
-path = rrt.plan()
+def example_run():
+    x_end, y_end, z_end  = (0.450628752997, 0.161615832271, 0.217447307078)
+    goal_config = ik_service_client(x_end, y_end, z_end)
+    #x_end, y_end, z_end  = (0.9, 0.16, 0.4)
+    start_config = {
+        'right_j0':0.0,
+        'right_j1':0.0,
+        'right_j2':0.0,
+        'right_j3':0.0,
+        'right_j4':0.0,
+        'right_j5':0.0,
+        'right_j6':0.0
+    }
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    sawyer.plot(ax)
+    sawyer.change_config(goal_config)
+    sawyer.plot(ax)
+    for sphere in obstacles:
+        sphere.plot(ax)
+    plt.show()
+    rrt = RRT(start_config, goal_config, max_iter=1000)
+    if rrt.node_collides(Node(goal_config)):
+        print("Goal is in obstacle")
+        return
+    sawyer.print_reference_frames()
+    print(start_config, goal_config)
+    print('starting endpoint', sawyer.get_endpoint(config=start_config))
+    print('goal endpoint', sawyer.get_endpoint(config=goal_config))
+    print('starting_cost', cost_between_nodes(Node(goal_config), Node(start_config)))
+    input()
+    move_sawyer_along_path(rrt.plan())
 
-if path is not None:
-    visualize_rrt(rrt, path)
+
+
+
+if __name__ == "__main__":
+    example_run()

@@ -4,8 +4,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at # #     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
+# # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
@@ -19,6 +18,7 @@
 Intera RSDK Inverse Kinematics Example
 """
 import rospy
+import intera_interface
 from geometry_msgs.msg import (
     PoseStamped,
     Pose,
@@ -33,7 +33,7 @@ from intera_core_msgs.srv import (
     SolvePositionIKRequest,
 )
 
-rospy.init_node("rsdk_ik_service_client")
+
 def ik_service_client(x, y, z):
     """ 
     Perforsm inverse kinematics on a cartesian point in 3D space
@@ -93,7 +93,13 @@ def ik_service_client(x, y, z):
 
 
 if __name__ == '__main__':
-    if ik_service_client(0.450628752997, 0.161615832271, 0.217447307078):
+    rospy.init_node("rsdk_ik_service_client")
+    joints = ik_service_client(0.450628752997, 0.161615832271, 0.217447307078)
+    if joints:
         rospy.loginfo("Simple IK call passed!")
+        limb = intera_interface.Limb('right') # get the right limb's current joint angles
+        limb.move_to_joint_positions(joints) # Sawyer wants t stretch
+
+
     else:
         rospy.logerr("Simple IK call FAILED")

@@ -14,7 +14,7 @@ class Direction(Enum):
     Y = 2
     Z = 3
 
-def get_rotation_matrix(direction: Direction, angle: Number) -> np.ndarray:
+def rotation_matrix(direction: Direction, angle: Number) -> np.ndarray:
     """
     Return a 3D rotation matrix about the X, Y, or Z-axis. 
     Follows this link on rotation matrices:
