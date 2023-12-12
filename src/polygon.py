@@ -39,6 +39,44 @@ class Polygon(ABC):
         """
         pass
 
+class Sphere(Polygon):
+    """"
+    Object representing Sphere in 3D space. Sphere should be in world boyd freom
+    """
+    def __init__(self, radius: Number, center: np.ndarray, hollow=False):
+        super().__init__(hollow)
+        self.radius = radius
+        assert isinstance(center, np.ndarray) and center.shape == (3,1)
+        self.center = center
+    
+
+    def is_collision(self, test_points: np.ndarray) -> bool:
+        """
+        Checks whether the any point in test_points is in collsion with the sphere
+        """
+        assert (isinstance(test_points, np.ndarray)
+            and test_points.ndim == 2
+            and test_points.shape[0] == 3
+        )
+        for point in test_points.T:
+            dist_from_center = np.linalg.norm(point - self.center)
+            within_sphere = dist_from_center <= self.radius
+            filled_in = not self._hollow
+            if ((filled_in and within_sphere) or
+                (not filled_in and within_sphere)):
+                print(point, 'in sphere')
+                return True
+        return False
+
+    def plot(self, ax, color='b') -> None:
+        u = np.linspace(0, 2 * np.pi, 50)
+        v = np.linspace(0, np.pi, 50)
+        x = self.center[0][0] + self.radius * np.outer(np.cos(u), np.sin(v))
+        y = self.center[1][0] + self.radius * np.outer(np.sin(u), np.sin(v))
+        z = self.center[2][0] + self.radius * np.outer(np.ones(np.size(u)), np.cos(v))
+
+        ax.plot_surface(x, y, z, color=color, alpha=0.6)
+
 class Cylinder(Polygon):
     """"
     Object representing Cylinder in 3D space. 
@@ -122,46 +160,21 @@ class Cylinder(Polygon):
                 print(point, 'in cylinder')
                 return True
         return False
-
-
-class Sphere(Polygon):
-    """"
-    Object representing Sphere in 3D space. Sphere should be in world boyd freom
-    """
-    def __init__(self, radius: Number, center: np.ndarray, hollow=False):
-        super().__init__(hollow)
-        self.radius = radius
-        assert isinstance(center, np.ndarray) and center.shape == (1,3)
-        self.center = center
     
-
-    def is_collision(self, test_points: np.ndarray) -> bool:
+    def collides_with_sphere(self, sphere: Sphere) -> bool:
         """
-        Checks whether the any point in test_points is in collsion with the sphere
+        Returns true if cylinder collides with sphere.
         """
-        assert (isinstance(test_points, np.ndarray)
-            and test_points.ndim == 2
-            and test_points.shape[0] == 3
+        # Center of sphere wrt to the cylinder
+        sphere_center = self._rotation.T @ (sphere.center - self._translation)
+        # Closest point to cylinder's axis
+        print(sphere_center.shape)
+        closest_point_to_axis = np.clip(
+            np.array([[0],[0],[sphere_center[2, 0]]]),
+            0,
+            self.height
         )
-        for point in test_points.T:
-            dist_from_center = np.linalg.norm(point - self.center)
-            within_sphere = dist_from_center <= self.radius
-            filled_in = not self._hollow
-            if ((filled_in and within_sphere) or
-                (not filled_in and within_sphere)):
-                print(point, 'in sphere')
-                return True
-        return False
-
-    def plot(self, ax, color='b') -> None:
-        u = np.linspace(0, 2 * np.pi, 50)
-        v = np.linspace(0, np.pi, 50)
-        x = self.center[0][0] + self.radius * np.outer(np.cos(u), np.sin(v))
-        y = self.center[0][1] + self.radius * np.outer(np.sin(u), np.sin(v))
-        z = self.center[0][2] + self.radius * np.outer(np.ones(np.size(u)), np.cos(v))
-
-        ax.plot_surface(x, y, z, color=color, alpha=0.6)
-
+        return np.linalg.norm(sphere_center - closest_point_to_axis) < sphere.radius + self.radius
 
 
 ################ Testing Functions
@@ -188,7 +201,7 @@ def plot_sphere():
     """
     Plotting a sphere 
     """
-    sphere = Sphere(1, np.array([[1, 1, 1]]))
+    sphere = Sphere(1, np.array([[1], [1], [1]]))
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.set_xlabel('X')
@@ -202,7 +215,7 @@ def test_collision():
     """
     Test 
     """
-    sphere = Sphere(1, np.array([[1, 1, 1]]))
+    sphere = Sphere(1, np.array([[1], [1], [1]]))
     cylinder = Cylinder(1, 5)
     cylinder.set_body_frame(
         geometry.get_rotation_matrix(geometry.Direction.X, np.pi / 4),
@@ -223,7 +236,29 @@ def test_collision():
         ax.scatter(test_points[0, :], test_points[1, :], test_points[2, :], c='r', marker='o')
         plt.show()
 
+def test_collision_with_sphere():
+    """
+    Test if sphere collides with cylinder
+    """
+    sphere = Sphere(1, np.array([[-10], [-10], [-10]]))
+    cylinder = Cylinder(1, 5)
+    cylinder.set_body_frame(
+        geometry.get_rotation_matrix(geometry.Direction.X, np.pi / 4),
+        np.array([[0], [0], [1]])
+    )
 
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    cylinder.plot(ax)
+    sphere.plot(ax)
+    if cylinder.collides_with_sphere(sphere):
+        print("Collision")
+    else:
+        print("No collision")
+    plt.show()
 
 if __name__ == "__main__":
-    test_collision()
+    test_collision_with_sphere()

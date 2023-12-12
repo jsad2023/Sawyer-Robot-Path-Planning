@@ -35,6 +35,9 @@ from intera_core_msgs.srv import (
 
 rospy.init_node("rsdk_ik_service_client")
 def ik_service_client(x, y, z):
+    """ 
+    Perforsm inverse kinematics on a cartesian point in 3D space
+    """
     ns = "ExternalTools/right/PositionKinematicsNode/IKService"
     iksvc = rospy.ServiceProxy(ns, SolvePositionIK)
     ikreq = SolvePositionIKRequest()
