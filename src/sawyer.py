@@ -177,7 +177,6 @@ class Sawyer:
             self.change_config(config)
         rotation_matrix, translation = self._cylinders[-1].get_body_frame()
         v = np.array([[0], [0], [self._link_lengths[-1]]])
-        print(rotation_matrix, translation)
         if config is not None:
             self.angles = old_config
         return rotation_matrix @ v + translation
@@ -215,6 +214,12 @@ def rotating_sawyer():
     ax.set_zlabel('Z')
     sawyer = Sawyer()
     sawyer.plot(ax)
+    sawyer.angles['right_j0'] = np.pi / 4
+    sawyer.angles['right_j1'] = np.pi / 4
+    sawyer.angles['right_j2'] = np.pi / 4
+    sawyer.angles['right_j3'] = np.pi / 4
+    sawyer.angles['right_j4'] = np.pi / 4
+    sawyer.angles['right_j5'] = np.pi / 4
     sawyer.angles['right_j6'] = np.pi / 4
     sawyer.set_reference_frames()
     sawyer.move_to_joint_positions()

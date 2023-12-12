@@ -7,9 +7,8 @@ from numbers import Number
 import numpy as np
 import matplotlib.pyplot as plt
 from sawyer import Sawyer
-from obstacles import obstacles
+from obstacles import obstacles, goal_cartesian_point
 from inverse_kinematics import ik_service_client
-
 sawyer = Sawyer()
 class Node:
     """
@@ -19,19 +18,22 @@ class Node:
         self.config = config
         self.parent = None
 
+def get_endpoint_from_config(node: Node) -> np.ndarray:
+    old_config = sawyer.get_config()
+    if not sawyer.change_config(node1.config):
+        return np.fill((3,1), np.inf)
+    v1 = sawyer.get_endpoint()
+    sawyer.change_config(old_config)
+    return v1
+
 def cost_between_nodes(node1: Node, node2: Node) -> Number:
     """
     Function to determine the cost between nodes
     """
-    old_config = sawyer.get_config()
-    if not sawyer.change_config(node1.config):
-        return np.inf 
-    v1 = sawyer.get_endpoint()
-    if not sawyer.change_config(node2.config):
-        return np.inf 
-    v2 = sawyer.get_endpoint()
-    sawyer.change_config(old_config)
-    return np.linalg.norm(v1 - v2)
+    angles1 = np.array(list(node1.config.values())).reshape(7,1)
+    angles2 = np.array(list(node2.config.values())).reshape(7,1)
+    return np.linalg.norm(angles1 - angles2)
+
 
 #def generate_new_node(config1: dict, config2: dict, mult: Number) -> dict:
 #    """
@@ -53,7 +55,8 @@ class RRT:
         self.dimensions = 7
         self.goal = Node(goal)
         self.max_iter = max_iter
-        self.step_size = 0.25
+        self.step_size = np.pi 
+        self.threshold = 2.25
         self.nodes = [self.start]
 
     def generate_random_node(self) -> Node:
@@ -63,10 +66,10 @@ class RRT:
         while True:
             #print('loop1')
             close_configuration = np.random.choice(self.nodes)
-            angle_values = list(close_configuration.config.values())
-            random_array = [ang + np.random.rand() - .5 for ang in angle_values]
+            angles = np.array(list(close_configuration.config.values()))
+            angles = angles.reshape(7,1) + np.random.uniform(-np.pi / 6, np.pi / 6, (self.dimensions, 1))
             #random_array = list(np.random.uniform(low=-np.pi, high=np.pi, size=self.dimensions))
-            config = dict(zip(sawyer.joint_names, random_array))
+            config = dict(zip(sawyer.joint_names, list(angles.flatten())))
             #input(f"{config}")
             if not self.node_collides(Node(config)):
                 #print(config, close_configuration.config)
@@ -76,12 +79,18 @@ class RRT:
         """
         Generate new node which is q_near + (q_rand - q_near) * step_size
         """
+
+        angles_near = np.array(list(q_near.config.values())).reshape(7,1)
+        angles_rand = np.array(list(q_rand.config.values())).reshape(7,1)
+        direction = angles_rand - angles_near
+        distance = np.linalg.norm(direction)
+        if distance > self.step_size:
+            direction = self.step_size * direction / distance
+        new_angles = angles_near + direction
+
         new_config = {}
-        for name in sawyer.joint_names:
-            new_config[name] = (
-                self.step_size * (q_rand.config[name] - q_near.config[name])
-                + q_near.config[name]
-            )
+        for name, angle in zip(sawyer.joint_names, list(new_angles.flatten())):
+            new_config[name] = angle
         return Node(new_config)
 
     def node_collides(self, q: Node) -> bool:
@@ -112,8 +121,7 @@ class RRT:
         """
         Determien if goal is reached. 
         """
-        #print(cost_between_nodes(q, self.goal))
-        return cost_between_nodes(q, self.goal) < self.step_size
+        return cost_between_nodes(q, self.goal) < self.threshold
 
     def extend(self, q_rand: Node) -> Node:
         """
@@ -123,7 +131,6 @@ class RRT:
         #new_config = self.steer(nearest_node.config, random_config)
         q_new = self.generate_new_node(q_near, q_rand)
         if not self.node_collides(q_new):
-            #print('adding new node to tree. Size=', len(self.nodes))
             self.nodes.append(q_new)
             q_new.parent = q_near
             return q_new
@@ -133,7 +140,9 @@ class RRT:
         """
         Planner for RRT
         """
-        for _ in range(self.max_iter):
+        for i in range(self.max_iter):
+            if i % 50 == 0:
+                print(f"We have {i} points in RRT")
             q_rand = self.generate_random_node()
             new_node = self.extend(q_rand)
             if new_node and self.is_goal_reached(new_node):
@@ -153,6 +162,7 @@ class RRT:
         while current_node is not None:
             node_path.append(current_node)
             current_node = current_node.parent
+        print(f"Length of paths is {len(node_path)}")
         return np.array(node_path[::-1])
 
 def visualize_rrt(rrt, path=None):
@@ -174,14 +184,14 @@ def visualize_rrt(rrt, path=None):
 
 def move_sawyer_along_path(node_path: List[Node]) -> None:
     for node in node_path:
-        print(sawyer.get_endpoint())
+        print("Moving....")
         if not sawyer.change_config(node.config):
             print("something went wrong")
         sawyer.move_to_joint_positions()
-        rospy.sleep(0.5)
+        rospy.sleep(.75)
 
 def example_run():
-    x_end, y_end, z_end  = (0.450628752997, 0.161615832271, 0.217447307078)
+    x_end, y_end, z_end  = goal_cartesian_point 
     goal_config = ik_service_client(x_end, y_end, z_end)
     #x_end, y_end, z_end  = (0.9, 0.16, 0.4)
     start_config = {
@@ -204,16 +214,15 @@ def example_run():
     for sphere in obstacles:
         sphere.plot(ax)
     plt.show()
-    rrt = RRT(start_config, goal_config, max_iter=1000)
+    rrt = RRT(start_config, goal_config, max_iter=10000)
     if rrt.node_collides(Node(goal_config)):
         print("Goal is in obstacle")
         return
-    sawyer.print_reference_frames()
-    print(start_config, goal_config)
+    sawyer.change_config(start_config)
     print('starting endpoint', sawyer.get_endpoint(config=start_config))
     print('goal endpoint', sawyer.get_endpoint(config=goal_config))
     print('starting_cost', cost_between_nodes(Node(goal_config), Node(start_config)))
-    input()
+    print("Starting planner....")
     move_sawyer_along_path(rrt.plan())
 
 

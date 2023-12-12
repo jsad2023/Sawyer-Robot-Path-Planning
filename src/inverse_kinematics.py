@@ -82,8 +82,6 @@ def ik_service_client(x, y, z):
                 ikreq.SEED_CURRENT: 'Current Joint Angles',
                 ikreq.SEED_NS_MAP: 'Nullspace Setpoints',
                }.get(resp.result_type[0], 'None')
-    rospy.loginfo("SUCCESS - Valid Joint Solution Found from Seed Type: %s" %
-          (seed_str,))
     # Format solution into Limb API-compatible dictionary
     limb_joints = dict(list(zip(resp.joints[0].name, resp.joints[0].position)))
     rospy.loginfo("\nIK Joint Solution:\n%s", limb_joints)
