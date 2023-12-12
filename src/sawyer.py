@@ -99,13 +99,13 @@ class Sawyer:
             rotation_prev = rotation_new
             translation_prev = translation_new
 
-    def plot(self, ax):
+    def plot(self, ax, color='r'):
         """
         Plot the sawyer robot in 3d space
         """
         self.set_reference_frames()
         for cylinder in self._cylinders:
-            cylinder.plot(ax)
+            cylinder.plot(ax, color=color)
     def move_to_joint_positions(self):
         """
         Move the sawyer robot to the current positions.
@@ -215,11 +215,12 @@ def rotating_sawyer():
     ax.set_zlabel('Z')
     sawyer = Sawyer()
     sawyer.plot(ax)
-    sawyer.angles['right_j0'] = np.pi / 4
+    sawyer.angles['right_j6'] = np.pi / 4
     sawyer.set_reference_frames()
+    sawyer.move_to_joint_positions()
     sawyer.plot(ax, color='b')
     plt.show()
 
 
 if __name__ == "__main__":
-    rotate_sawyer()
+    rotating_sawyer()
