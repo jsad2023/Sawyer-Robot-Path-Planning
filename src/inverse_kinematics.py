@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This is python script is modified from a code example provided by Rethink Robotics. 
+# This is python script is modified from a code example provided by Rethink Robotics.
 # Date: 2023-12-10
 # Name: Justin Sadler
 
@@ -67,22 +67,15 @@ def ik_service_client(x, y, z):
         rospy.wait_for_service(ns, 5.0)
         resp = iksvc(ikreq)
     except (rospy.ServiceException, rospy.ROSException) as e:
-        rospy.logerr("Service call failed: %s" % (e,))
+        rospy.logerr(f"Service call failed: {e}")
         return False
 
     # Result is invalid
-    if (resp.result_type[0] <= 0):
+    if resp.result_type[0] <= 0:
         rospy.logerr("INVALID POSE - No Valid Joint Solution Found.")
         rospy.logerr("Result Error %d", resp.result_type[0])
         return None
 
-    # Type of seed ultimately used to get solution
-    seed_str = {
-                ikreq.SEED_USER: 'User Provided Seed',
-                ikreq.SEED_CURRENT: 'Current Joint Angles',
-                ikreq.SEED_NS_MAP: 'Nullspace Setpoints',
-               }.get(resp.result_type[0], 'None')
-    # Format solution into Limb API-compatible dictionary
     limb_joints = dict(list(zip(resp.joints[0].name, resp.joints[0].position)))
     rospy.loginfo("\nIK Joint Solution:\n%s", limb_joints)
     rospy.loginfo("------------------")

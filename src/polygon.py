@@ -6,7 +6,6 @@ from numbers import Number
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
 import geometry
 
 
@@ -37,7 +36,6 @@ class Polygon(ABC):
         """
         Abstract method for plotting polygon in 3D space. 
         """
-        pass
 
 class Sphere(Polygon):
     """"
@@ -48,8 +46,6 @@ class Sphere(Polygon):
         self.radius = radius
         assert isinstance(center, np.ndarray) and center.shape == (3,1)
         self.center = center
-    
-
     def is_collision(self, test_points: np.ndarray) -> bool:
         """
         Checks whether the any point in test_points is in collsion with the sphere
@@ -89,7 +85,7 @@ class Cylinder(Polygon):
         self.radius = radius
         self.height = height
         self._rotation = None
-        self._translation = None    
+        self._translation = None
     def plot(self, ax, color='r') -> None:
         """
         Plot Cylinder
@@ -141,7 +137,6 @@ class Cylinder(Polygon):
         vector iwll be calculate
         """
         return self._rotation, self._translation
-    
     def _collides_with_point(self, point: np.ndarray) -> bool:
         """
         Boolean function to determine if point collides with cylinder.
@@ -170,7 +165,6 @@ class Cylinder(Polygon):
                 print(point, 'in cylinder')
                 return True
         return False
-    
     def collides_with_sphere(self, sphere: Sphere) -> bool:
         """
         Returns true if cylinder collides with sphere.
@@ -194,7 +188,7 @@ def plot_cylinder():
     """
     cylinder = Cylinder(1, 5)
     cylinder.set_body_frame(
-        geometry.get_rotation_matrix(geometry.Direction.X, np.pi / 4),
+        geometry.rotation_matrix(geometry.Direction.X, np.pi / 4),
         np.array([[0], [0], [1]])
     )
     fig = plt.figure()
@@ -227,7 +221,7 @@ def test_collision():
     sphere = Sphere(1, np.array([[1], [1], [1]]))
     cylinder = Cylinder(1, 5)
     cylinder.set_body_frame(
-        geometry.get_rotation_matrix(geometry.Direction.X, np.pi / 4),
+        geometry.rotation_matrix(geometry.Direction.X, np.pi / 4),
         np.array([[0], [0], [1]])
     )
 
@@ -252,7 +246,7 @@ def test_collision_with_sphere():
     sphere = Sphere(1, np.array([[-10], [-10], [-10]]))
     cylinder = Cylinder(1, 5)
     cylinder.set_body_frame(
-        geometry.get_rotation_matrix(geometry.Direction.X, np.pi / 4),
+        geometry.rotation_matrix(geometry.Direction.X, np.pi / 4),
         np.array([[0], [0], [1]])
     )
 

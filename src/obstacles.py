@@ -9,4 +9,3 @@ obstacles = [
 ]
 
 goal_cartesian_point = (0.1, .5, .3)
-

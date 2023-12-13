@@ -44,6 +44,4 @@ def rotation_matrix(direction: Direction, angle: Number) -> np.ndarray:
         ])
     else:
         assert False
-    
     return matrix
-    

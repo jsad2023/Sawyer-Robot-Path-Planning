@@ -5,13 +5,11 @@ from numbers import Number
 from typing import List
 import numpy as np
 import rospy # intera_interface - Sawyer Python API
-import intera_interface # initialize our ROS node, registering it with the Master 
+import intera_interface # initialize our ROS node, registering it with the Master
+import matplotlib.pyplot as plt
 from polygon import Cylinder, Sphere
 from geometry import rotation_matrix
 from geometry import Direction
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
-from inverse_kinematics import ik_service_client
 
 class Sawyer:
     """
@@ -56,7 +54,6 @@ class Sawyer:
         radii = [0.08, 0.08, 0.05, 0.05, 0.03, 0.05, 0.03]
         self._cylinders = [Cylinder(r, l) for r, l in zip(radii, self._link_lengths)]
         self.set_reference_frames()
-    
     def set_reference_frames(self) -> None:
         """
         Set the reference frames for the cylinders.
@@ -136,7 +133,8 @@ class Sawyer:
         old_config = self.angles
         for joint_name, angle in config.items():
             if not self.change_joint_angle(joint_name, angle):
-                print(f"Configuration {config} is not possible.\n{joint_name} can't be at angle {angle}")
+                print(f"Configuration {config} is not possible."
+                      +f"\n{joint_name} can't be at angle {angle}")
                 self.angles = old_config
                 return False
         self.set_reference_frames()
@@ -155,7 +153,7 @@ class Sawyer:
                 self.angles = old_config
                 return True
         self.angles = old_config
-        return False    
+        return False
     def collides_with_sphere(self, obstacles: List[Sphere]):
         """
         Test if sawyer is in collision with any spheres in 
@@ -167,21 +165,27 @@ class Sawyer:
                 if cylinder.collides_with_sphere(sphere):
                     return True
         return False
-    
     def get_config(self):
+        """
+        Return the configuration
+        """
         return self.angles
-    
     def get_endpoint(self, config=None):
+        """
+        Calculate the end-effector position based on the current configuration
+        """
         if config is not None:
             old_config = self.angles
             self.change_config(config)
-        rotation_matrix, translation = self._cylinders[-1].get_body_frame()
+        rot_mat, translation = self._cylinders[-1].get_body_frame()
         v = np.array([[0], [0], [self._link_lengths[-1]]])
         if config is not None:
             self.angles = old_config
-        return rotation_matrix @ v + translation
-    
+        return rot_mat @ v + translation
     def print_reference_frames(self):
+        """
+        Print information on the reference frames of the cylinders. 
+        """
         print('----------------reference frames for config', self.angles)
         for cylinder in self._cylinders:
             print(cylinder.get_body_frame())

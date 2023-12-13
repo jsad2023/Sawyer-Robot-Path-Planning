@@ -1,15 +1,15 @@
 """
 Module for Rapidly-exploring Random Trees (RRT)
 """
-import rospy # intera_interface - Sawyer Python API
 from typing import List
 from numbers import Number
+import rospy # intera_interface - Sawyer Python API
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from sawyer import Sawyer
 from obstacles import obstacles, goal_cartesian_point
 from inverse_kinematics import ik_service_client
-import matplotlib.animation as animation
 
 sawyer = Sawyer()
 class Node:
@@ -21,8 +21,11 @@ class Node:
         self.parent = None
 
 def get_endpoint_from_config(node: Node) -> np.ndarray:
+    """
+    Get the position of the end-effector based on the configuration
+    """
     old_config = sawyer.get_config()
-    if not sawyer.change_config(node1.config):
+    if not sawyer.change_config(node.config):
         return np.fill((3,1), np.inf)
     v1 = sawyer.get_endpoint()
     sawyer.change_config(old_config)
@@ -57,7 +60,7 @@ class RRT:
         self.dimensions = 7
         self.goal = Node(goal)
         self.max_iter = max_iter
-        self.step_size = np.pi 
+        self.step_size = np.pi
         self.threshold = 2.25
         self.nodes = [self.start]
 
@@ -69,7 +72,7 @@ class RRT:
             #print('loop1')
             close_configuration = np.random.choice(self.nodes)
             angles = np.array(list(close_configuration.config.values()))
-            angles = angles.reshape(7,1) + np.random.uniform(-np.pi / 6, np.pi / 6, (self.dimensions, 1))
+            angles = angles.reshape(7,1) + np.random.uniform(-np.pi/6,np.pi/6,(self.dimensions, 1))
             #random_array = list(np.random.uniform(low=-np.pi, high=np.pi, size=self.dimensions))
             config = dict(zip(sawyer.joint_names, list(angles.flatten())))
             #input(f"{config}")
@@ -167,24 +170,10 @@ class RRT:
         print(f"Length of paths is {len(node_path)}")
         return np.array(node_path[::-1])
 
-def visualize_rrt(rrt, path=None):
-    nodes = np.array([node.config for node in rrt.nodes])
-
-    plt.scatter(nodes[:, 0], nodes[:, 1], c='blue', marker='o', label='RRT Nodes')
-
-    if path is not None:
-        plt.plot(path[:, 0], path[:, 1], c='green', linewidth=2, label='RRT Path')
-
-    plt.scatter(rrt.start.config[0], rrt.start.config[1], c='red', marker='s', label='Start')
-    plt.scatter(rrt.goal_config[0], rrt.goal_config[1], c='orange', marker='s', label='Goal')
-
-    plt.legend()
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title('Rapidly-exploring Random Trees (RRT)')
-    plt.show()
-
 def move_sawyer_along_path(node_path: List[Node]) -> None:
+    """
+    Control the sawyer robot to move along a path
+    """
     for node in node_path:
         print("Moving....")
         if not sawyer.change_config(node.config):
@@ -218,12 +207,15 @@ def animate_sawyer(node_path: List[Node]) -> None:
         x_goal, y_goal, z_goal = goal_cartesian_point
         ax.scatter(x_goal, y_goal, z_goal, marker="*", color='gold')
 
-    ani = animation.FuncAnimation(fig=fig, func=update, frames=len(node_path))
+    animation.FuncAnimation(fig=fig, func=update, frames=len(node_path))
     plt.show()
 
 
 def run():
-    x_end, y_end, z_end  = goal_cartesian_point 
+    """
+    Run RRT planner, move the Sawyer robot, animate the Sawyer animatio
+    """
+    x_end, y_end, z_end  = goal_cartesian_point
     goal_config = ik_service_client(x_end, y_end, z_end)
     #x_end, y_end, z_end  = (0.9, 0.16, 0.4)
     start_config = {
