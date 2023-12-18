@@ -1,9 +1,9 @@
 """
 Main results
 """
-from src.rrt import run
-from src.polygon import plot_sphere, plot_cylinder
-from src.sawyer import plot_sawyer
+from rrt import run
+from polygon import plot_sphere, plot_cylinder
+from sawyer import plot_sawyer
 
 
 if __name__ == "__main__":
